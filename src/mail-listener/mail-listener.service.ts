@@ -68,15 +68,15 @@ export class EmailListenerService implements OnModuleInit, OnModuleDestroy {
     if (mailFromTarget > -1) {
       this.logger.warn('Got email from target');
       console.log('New email received From Target:', email);
-
-      email = await this.extractMailFeatures(email);
-
-      console.log(email.link, email.item, email.region);
-      await this.sendReplyEmail(email);
+      //should extract mail and resend it here
     } else {
       this.logger.log('Got public email');
       console.log('New email received Public:', email);
     }
+    //parsing mail here for testing only
+    email = await this.extractMailFeatures(email);
+    console.log(email.link, email.item, email.region);
+    await this.sendReplyEmail(email);
   }
 
   private handleAttachment(attachment) {
