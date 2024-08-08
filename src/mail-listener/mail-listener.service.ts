@@ -32,24 +32,19 @@ export class EmailListenerService implements OnModuleInit, OnModuleDestroy {
       const mailFromTarget = mail.from.findIndex(
         (el) => el.address == process.env.LISTEN_FOR_EMAIL,
       );
+      const email = {
+        from: mail.from,
+        to: mail.to,
+        subject: mail.subject,
+        body: mail.text,
+      };
       if (mailFromTarget > -1) {
         this.logger.warn('got email from target');
-        console.log(
-          'New email received From Target:',
-          mail.from,
-          mail.to,
-          mail.subject,
-          mail.text,
-        );
+
+        console.log('New email received From Target:', email);
       } else {
         this.logger.log('got public email');
-        console.log(
-          'New email received Public:',
-          mail.from,
-          mail.to,
-          mail.subject,
-          mail.text,
-        );
+        console.log('New email received Public:', email);
       }
 
       // Handle the new email
