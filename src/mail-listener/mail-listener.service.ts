@@ -1,10 +1,15 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Logger,
+  Injectable,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import * as MailListener from 'mail-listener2';
 
 @Injectable()
 export class EmailListenerService implements OnModuleInit, OnModuleDestroy {
   private mailListener: MailListener;
-
+  private readonly logger = new Logger(EmailListenerService.name);
   constructor() {
     this.mailListener = new MailListener({
       username: process.env.EMAIL,
@@ -24,38 +29,53 @@ export class EmailListenerService implements OnModuleInit, OnModuleDestroy {
     });
 
     this.mailListener.on('mail', (mail, seqno, attributes) => {
-      console.log(
-        'New email received:',
-        mail.text,
-        mail.from,
-        mail.to,
-        mail.subject,
+      const mailFromTarget = mail.from.findIndex(
+        (el) => el.address == process.env.LISTEN_FOR_EMAIL,
       );
+      if (mailFromTarget > -1) {
+        this.logger.warn('got email from target');
+        console.log(
+          'New email received From Target:',
+          mail.from,
+          mail.to,
+          mail.subject,
+          mail.text,
+        );
+      } else {
+        this.logger.log('got public email');
+        console.log(
+          'New email received Public:',
+          mail.from,
+          mail.to,
+          mail.subject,
+          mail.text,
+        );
+      }
 
       // Handle the new email
     });
 
     this.mailListener.on('attachment', (attachment) => {
-      console.log('New attachment received:', attachment);
+      this.logger.log('New attachment received:', attachment);
       // Handle the attachment
     });
 
     this.mailListener.on('error', (err) => {
-      console.error('Mail Listener Error:', err);
+      this.logger.error('Mail Listener Error:', err);
     });
 
     this.mailListener.on('end', () => {
-      console.log('Mail Listener has stopped.');
+      this.logger.warn('Mail Listener has stopped.');
     });
   }
 
   onModuleInit() {
     this.mailListener.start();
-    console.log('Mail Listener started.');
+    this.logger.log('Mail Listener started.');
   }
 
   onModuleDestroy() {
     this.mailListener.stop();
-    console.log('Mail Listener stopped.');
+    this.logger.warn('Mail Listener stopped.');
   }
 }
