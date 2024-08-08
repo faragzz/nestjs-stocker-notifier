@@ -22,6 +22,15 @@ export class EmailParserService {
     console.error('IMAP Error:', err);
     reject(err);
   }
+  private markAsSeen(imap, uid) {
+    imap.addFlags(uid, ['\\Seen'], (err) => {
+      if (err) {
+        console.error('Error marking email as seen:', err);
+      } else {
+        console.log('Marked email as read!');
+      }
+    });
+  }
 
   fetchAllEmails(): Promise<EmailParseResponse[]> {
     const imap = this.connectToImap();
@@ -29,45 +38,53 @@ export class EmailParserService {
 
     return new Promise((resolve, reject) => {
       imap.once('ready', () => {
-        imap.openBox('INBOX', true, (err, box) => {
+        imap.openBox('INBOX', false, (err, box) => {
           if (err) {
             this.handleError(err, reject);
             return;
           }
 
-          imap.search(['UNSEEN', ['X-GM-RAW', 'category:primary']], (err, results) => {
-            if (err) {
-              this.handleError(err, reject);
-              return;
-            }
+          imap.search(
+            ['UNSEEN', ['X-GM-RAW', 'category:primary']],
+            (err, results) => {
+              if (err) {
+                this.handleError(err, reject);
+                return;
+              }
 
-            if (!results.length) {
-              console.log('No unseen emails in the Primary tab.');
-              imap.end();
-              resolve(data);
-              return;
-            }
+              if (!results.length) {
+                console.log('No unseen emails in the Primary tab.');
+                imap.end();
+                resolve(data);
+                return;
+              }
 
-            const f = imap.fetch(results, { bodies: '' });
-            f.on('message', (msg) => {
-              msg.on('body', (stream) => {
-                simpleParser(stream, (err, parsed) => {
-                  if (err) {
-                    this.handleError(err, reject);
-                    return;
+              const f = imap.fetch(results, { bodies: '' });
+              f.on('message', (msg) => {
+                msg.on('body', (stream) => {
+                  simpleParser(stream, (err, parsed) => {
+                    if (err) {
+                      this.handleError(err, reject);
+                      return;
+                    }
+                    data.push(parsed);
+                    console.log('From:', parsed.from.text);
+                  });
+                });
+                msg.on('attributes', (msg) => {
+                  if (msg.uid) {
+                    this.markAsSeen(imap, msg.uid);
                   }
-                  data.push(parsed);
-                  console.log('From:', parsed.from.text);
                 });
               });
-            });
 
-            f.once('end', () => {
-              console.log('Done fetching all messages!');
-              imap.end();
-              resolve(data);
-            });
-          });
+              f.once('end', () => {
+                console.log('Done fetching all messages!');
+                imap.end();
+                resolve(data);
+              });
+            },
+          );
         });
       });
 
@@ -85,7 +102,7 @@ export class EmailParserService {
 
     return new Promise((resolve, reject) => {
       imap.once('ready', () => {
-        imap.openBox('INBOX', true, (err, box) => {
+        imap.openBox('INBOX', false, (err, box) => {
           if (err) {
             this.handleError(err, reject);
             return;
@@ -114,17 +131,25 @@ export class EmailParserService {
                   }
                   if (parsed.from.text.includes(specificSubject)) {
                     data.push(parsed);
+
                     console.log('Subject:', parsed.subject);
                     console.log('From:', parsed.from.text);
                     console.log('Body:', parsed.text);
                   }
                 });
               });
+              msg.on('attributes', (msg) => {
+                if (msg.uid) {
+                  this.markAsSeen(imap, msg.uid);
+                }
+              });
             });
 
             f.once('end', () => {
               const endTime = Date.now();
-              console.log(`Processing time: ${(endTime - startTime) / 1000} seconds`);
+              console.log(
+                `Processing time: ${(endTime - startTime) / 1000} seconds`,
+              );
               console.log('Done fetching all messages!');
               imap.end();
               resolve(data);
@@ -134,7 +159,11 @@ export class EmailParserService {
       });
 
       imap.once('error', (err) => this.handleError(err, reject));
-      imap.once('end', () => console.log('Connection ended'));
+      imap.once('end', () => {
+        console.log('Connection ended');
+
+        resolve(data);
+      });
 
       imap.connect();
     });
